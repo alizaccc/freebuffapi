@@ -57,6 +57,23 @@ class CapturingAdsClient(CodebuffClient):
         return {"ads": []}
 
 
+class FailingAdsClient(CodebuffClient):
+    def __init__(self) -> None:
+        super().__init__(
+            Settings(
+                codebuff_token="token",
+                local_api_key=None,
+                ad_providers=("gravity", "zeroclick"),
+                request_timeout=1,
+            )
+        )
+        self.providers = []
+
+    async def request_ads(self, provider, messages=None, surface=None):
+        self.providers.append(provider)
+        raise CodebuffError(f"{provider} unavailable", 502)
+
+
 class CodebuffClientTests(unittest.IsolatedAsyncioTestCase):
     def test_client_uses_explicit_proxy_only_when_enabled(self) -> None:
         captured = {}
@@ -122,6 +139,21 @@ class CodebuffClientTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertIsInstance(messages[0]["content"], list)
+
+    async def test_request_ad_chain_does_not_block_when_all_providers_fail(self) -> None:
+        client = FailingAdsClient()
+
+        try:
+            with self.assertLogs("freebuff2api.codebuff", level="WARNING") as logs:
+                await client.request_ad_chain(
+                    messages=[{"role": "user", "content": "hi"}]
+                )
+        finally:
+            await client.aclose()
+
+        self.assertEqual(client.providers, ["gravity", "zeroclick"])
+        self.assertIn("ads provider=gravity failed", logs.output[0])
+        self.assertIn("ads provider=zeroclick failed", logs.output[1])
 
     async def test_json_wraps_network_error_as_codebuff_error(self) -> None:
         def raise_connect_error(request: httpx.Request) -> httpx.Response:

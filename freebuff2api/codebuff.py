@@ -267,27 +267,35 @@ class CodebuffClient:
         surface: str | None = None,
     ) -> None:
         for provider in self.settings.ad_providers:
-            ads_data = await self.request_ads(
-                provider,
-                messages=messages,
-                surface=surface,
-            )
-            ads = ads_data.get("ads") or []
-            ad = ads[0] if ads else None
-            logger.info(
-                "ads provider=%s messages=%s count=%s selected=%s",
-                provider,
-                len(messages or []),
-                len(ads),
-                bool(ad),
-            )
-            if not ad:
-                continue
-            await self.report_zeroclick_impressions(
-                list(ad.get("impressionIds") or [])
-            )
-            await self.report_codebuff_impression(ad.get("impUrl") or "")
-            return
+            try:
+                ads_data = await self.request_ads(
+                    provider,
+                    messages=messages,
+                    surface=surface,
+                )
+                ads = ads_data.get("ads") or []
+                ad = ads[0] if ads else None
+                logger.info(
+                    "ads provider=%s messages=%s count=%s selected=%s",
+                    provider,
+                    len(messages or []),
+                    len(ads),
+                    bool(ad),
+                )
+                if not ad:
+                    continue
+                await self.report_zeroclick_impressions(
+                    list(ad.get("impressionIds") or [])
+                )
+                await self.report_codebuff_impression(ad.get("impUrl") or "")
+                return
+            except CodebuffError as error:
+                logger.warning(
+                    "ads provider=%s failed; continuing without blocking chat: %s",
+                    provider,
+                    error,
+                    exc_info=self.settings.debug,
+                )
 
     async def report_zeroclick_impressions(self, ids: list[str]) -> None:
         if not ids:
