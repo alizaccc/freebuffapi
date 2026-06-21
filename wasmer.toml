@@ -1,0 +1,17 @@
+[package]
+name = "alizaccc/freebuffapi"
+version = "0.1.0"
+description = "Freebuff2api on Wasmer Edge"
+readme = "README.md"
+license = "AGPL-3.0"
+
+[dependencies]
+"python" = "3"
+
+[fs]
+"/" = "."
+
+[[command]]
+name = "freebuff2api"
+module = "."
+run = "uv run freebuff2api"
